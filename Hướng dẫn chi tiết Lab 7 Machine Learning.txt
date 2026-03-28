@@ -1,0 +1,141 @@
+﻿Để giải quyết trọn vẹn 100% yêu cầu của thầy, chúng ta sẽ đi theo một quy trình Machine Learning chuẩn mực. Vì nhóm bạn làm việc trên môi trường thực tế (có thể người dùng Windows, người dùng Linux như Fedora), mình sẽ chia các bước cực kỳ chi tiết từ khâu setup thư mục cho đến lúc đóng gói, và chỉ rõ khái niệm nào được "lắp" vào bước nào.
+Dưới đây là từng bước thực hiện Lab 7:
+Bước 1: Khởi tạo Project & Thống nhất môi trường (Dành cho Cả Windows & Fedora)
+Để tránh tình trạng "code chạy được trên Windows của A nhưng lỗi trên Fedora của B", bước đầu tiên là phải tạo môi trường ảo và cấu trúc thư mục rõ ràng.
+1. Tạo thư mục gốc: Tạo thư mục Lab07_Nhóm_TênBạn.
+2. Mở Terminal (Fedora) hoặc PowerShell (Windows) tại thư mục đó và tạo môi trường ảo:
+   * Lệnh tạo: python -m venv venv
+   * Kích hoạt trên Fedora (Linux): source venv/bin/activate
+   * Kích hoạt trên Windows: .\venv\Scripts\activate
+3. Cài đặt thư viện & xuất file requirements.txt:
+   * Cài đặt: pip install pandas numpy scikit-learn matplotlib seaborn jupyter
+   * Lưu thư viện: pip freeze > requirements.txt (Để các thành viên khác pull code về chỉ cần chạy pip install -r requirements.txt là đồng bộ).
+4. Tạo file code: Tạo 1 file Lab07_Pima_Classification.ipynb.
+Bước 2: Báo cáo Word - Xác định ý nghĩa bài toán
+Áp dụng khái niệm: Phân lớp dữ liệu & Các độ đo đánh giá.
+Trong file Word (Lab07_HoTenMaSV.docx), bạn viết rõ các mục sau ngay từ trang đầu:
+* Input: Các vector đặc trưng của tập Pima (Số lần mang thai, Glucose, Huyết áp, Độ dày da, Insulin, BMI, Phả hệ tiểu đường, Tuổi).
+* Output: Biến mục tiêu Outcome (0: Không mắc tiểu đường, 1: Mắc tiểu đường).
+* Mục tiêu: Xây dựng mô hình phân lớp có khả năng dự đoán chính xác một người có bị tiểu đường hay không dựa trên các chỉ số y tế.
+* Độ đo (Metrics): Sử dụng Recall (để hạn chế tối đa việc đoán sót bệnh nhân) và F1-Score (để cân bằng hiệu suất tổng thể). Accuracy chỉ dùng để tham khảo phụ.
+* Câu hỏi nghiên cứu: Mô hình nào (trong các mô hình tuyến tính, cây quyết định...) phù hợp nhất với tập dữ liệu y tế quy mô nhỏ này? Tham số nào ảnh hưởng mạnh nhất đến mô hình?
+Bước 3: Code - Tiền xử lý dữ liệu và Rút trích đặc trưng
+Áp dụng khái niệm: Tiền xử lý và Rút trích đặc trưng.
+Trong file Jupyter Notebook, bạn bắt đầu nạp dữ liệu và xử lý các điểm vô lý. Ở tập Pima, các cột như Glucose, BloodPressure, SkinThickness, Insulin, BMI có chứa giá trị 0 (vô lý về mặt sinh học). Ta phải thay nó bằng giá trị NaN rồi điền giá trị trung vị (median) vào.
+
+
+Python
+
+
+
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# 1. Đọc dữ liệu (Đường dẫn chuẩn trong workplace)
+df = pd.read_csv('dataset/pima-indians-diabetes.csv')
+
+# 2. Tiền xử lý: Thay số 0 vô lý bằng NaN ở các cột cụ thể
+cols_to_replace = ['Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI']
+df[cols_to_replace] = df[cols_to_replace].replace(0, np.nan)
+
+# 3. Điền giá trị thiếu bằng Median (Trung vị)
+df[cols_to_replace] = df[cols_to_replace].fillna(df[cols_to_replace].median())
+
+# In kết quả kiểm tra trực tiếp ra màn hình
+print(df.isnull().sum()) 
+
+Tiếp theo, ta tách X (đặc trưng) và y (nhãn), sau đó chuẩn hóa (Scale) dữ liệu X để các mô hình học công bằng hơn.
+
+
+Python
+
+
+
+
+# Tách Input (X) và Output (y)
+X = df.drop('Outcome', axis=1)
+y = df['Outcome']
+
+# Chuẩn hóa dữ liệu (Scaling)
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+Bước 4: Code - Thực nghiệm huấn luyện mô hình
+Áp dụng khái niệm: Thực nghiệm huấn luyện & Chia tập dữ liệu.
+Bây giờ bạn chia dữ liệu thành tập Train (để dạy máy) và Test (để thi), tỷ lệ 80/20. Sau đó gọi các mô hình ra huấn luyện nghiệm thu.
+
+
+Python
+
+
+
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
+
+# Chia tập Train/Test (80% Train, 20% Test)
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42, stratify=y)
+
+# 1. Huấn luyện Logistic Regression (Mô hình Tuyến tính để so sánh)
+lr_model = LogisticRegression()
+lr_model.fit(X_train, y_train)
+print("Kết quả của Logistic Regression:")
+print(classification_report(y_test, lr_model.predict(X_test)))
+
+# 2. Huấn luyện Random Forest (Mô hình Cây)
+rf_model = RandomForestClassifier(random_state=42)
+rf_model.fit(X_train, y_train)
+print("Kết quả của Random Forest mặc định:")
+print(classification_report(y_test, rf_model.predict(X_test)))
+
+Bước 5: Code - Tìm tham số huấn luyện tối ưu
+Áp dụng khái niệm: Tìm tham số huấn luyện tối ưu (Hyperparameter Tuning).
+Kết quả ở Bước 4 là cấu hình mặc định. Bây giờ bạn dùng GridSearchCV để "vặn" các nút bên trong thuật toán Random Forest xem có cấu hình nào cho điểm cao hơn không.
+
+
+Python
+
+
+
+
+from sklearn.model_selection import GridSearchCV
+
+# Khai báo các tham số muốn thử nghiệm (vặn nút)
+param_grid = {
+   'n_estimators': [50, 100, 200],      # Số lượng cây quyết định
+   'max_depth': [None, 10, 20, 30],     # Độ sâu của cây
+   'min_samples_split': [2, 5, 10]      # Số mẫu tối thiểu để chia nhánh
+}
+
+# Chạy tìm kiếm tối ưu
+grid_search = GridSearchCV(estimator=RandomForestClassifier(random_state=42), 
+                          param_grid=param_grid, 
+                          cv=5, n_jobs=-1, scoring='recall') # Tối ưu hóa dựa trên Recall
+grid_search.fit(X_train, y_train)
+
+# In ra bộ tham số tốt nhất và chạy lại mô hình
+print("Bộ tham số tối ưu nhất:", grid_search.best_params_)
+best_rf = grid_search.best_estimator_
+y_pred_best = best_rf.predict(X_test)
+print("\nKết quả sau khi Tối ưu tham số (Random Forest tuned):")
+print(classification_report(y_test, y_pred_best))
+
+# Bước 5.1: Trực quan hóa kết quả bằng Confusion Matrix
+cm = confusion_matrix(y_test, y_pred_best)
+plt.figure(figsize=(6, 4))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.title('Confusion Matrix - Best Random Forest')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.show()
+
+Bước 6: Tổng hợp Word, soạn Slide & Đóng gói nộp bài
+1. Word: Chụp ảnh các bảng classification_report in ra ở Bước 4 và Bước 5 dán vào Word. Viết nhận xét: Mô hình trước và sau khi GridSearchCV thay đổi độ đo Recall/F1 như thế nào. Điền đủ trang bìa, mục lục, bảng phân công.
+2. Slide: Trích xuất các ý chính từ Word (Bài toán -> Tiền xử lý thế nào -> Biểu đồ so sánh kết quả các mô hình -> Kết luận mô hình nào tốt nhất).
+3. Đóng gói ZIP: Gom file Lab07_HoTenMaSV.docx, file Lab07_Slide.pptx, file Lab07_Pima_Classification.ipynb và file requirements.txt lại. Nén thành Lab07_HoTen_MaSV.zip (nhớ đổi tên thật của bạn trưởng nhóm).
+Bạn muốn mình lên dàn ý chi tiết từng slide thuyết trình (khoảng 8-10 slide) để Người C trong nhóm cứ thế mà điền nội dung vào không?
